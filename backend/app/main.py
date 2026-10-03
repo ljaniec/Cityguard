@@ -1,8 +1,12 @@
 import asyncio
 import base64
 import json
+import os
+import signal
+import sys
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -15,11 +19,11 @@ from .geo import haversine, route_length_m
 from .seed import (
     PATROL_DURATION_S,
     ROUTE_INFO,
+    ensure_patrol,
     list_revealed,
     load_route,
     position_at,
     route_segments,
-    seed_if_empty,
     street_at,
 )
 
@@ -38,8 +42,10 @@ patrol_state = {
     "street": street_at(0)[0],
 }
 
-sim_task: asyncio.Task | None = None
-stop_sim = asyncio.Event()
+ROOT = DATA.parent
+WORKER_PYTHON = ROOT / "ml" / ".venv" / "bin" / "python"
+WORKER_API = os.environ.get("CITYGUARD_API", "http://127.0.0.1:8000")
+worker: asyncio.subprocess.Process | None = None
 
 
 class Hub:
@@ -92,6 +98,8 @@ class PositionIn(BaseModel):
     lat: float | None = None
     lon: float | None = None
     heading: float | None = None
+    running: bool | None = None
+    speed: float | None = None
 
 
 async def _set_position(t: float, lat: float | None = None, lon: float | None = None, heading: float | None = None) -> dict:
@@ -146,11 +154,14 @@ def _get_event(event_id: str) -> dict:
     return event_dict(row)
 
 
-def _nearest(event_type: str, lat: float, lon: float, meters: float = 30):
+def _nearest(event_type: str, lat: float, lon: float, class_name: str | None = None, meters: float = 30):
     rows = read_all("SELECT * FROM events WHERE type = ?", (event_type,))
     best = None
     best_d = meters
     for row in rows:
+        other = json.loads(row["meta"] or "{}").get("class_name")
+        if class_name and other and other != class_name:
+            continue
         dist = haversine(lat, lon, row["lat"], row["lon"])
         if dist <= best_d:
             best = row
@@ -165,62 +176,19 @@ def _save_image(event_id: str, encoded: str) -> str:
     return f"/media/{event_id}.jpg"
 
 
-def _hide_live() -> None:
-    write(
-        """
-        UPDATE events
-        SET revealed = 0, status = 'new'
-        WHERE t_offset IS NOT NULL
-        """
-    )
-
-
-async def _run_sim(speed: float) -> None:
-    _hide_live()
-    patrol_state["progress"] = 0
-    await hub.broadcast({"kind": "reset"})
-    await hub.broadcast({"kind": "status", "running": True})
-    await asyncio.sleep(0.4)
-    pending = read_all(
-        "SELECT id, t_offset FROM events WHERE t_offset IS NOT NULL ORDER BY t_offset ASC"
-    )
-    cursor = 0
-    sim_t = 0.0
-    tick = 0.25
-    try:
-        while sim_t < PATROL_DURATION_S:
-            if stop_sim.is_set():
-                break
-            sim_t = min(PATROL_DURATION_S, sim_t + tick * speed)
-            await _set_position(sim_t)
-            while cursor < len(pending) and pending[cursor]["t_offset"] <= sim_t:
-                event_id = pending[cursor]["id"]
-                write(
-                    "UPDATE events SET revealed = 1, timestamp = ? WHERE id = ?",
-                    (datetime.now(timezone.utc).isoformat(), event_id),
-                )
-                await hub.broadcast({"kind": "event", "event": _get_event(event_id)})
-                cursor += 1
-            await asyncio.sleep(tick)
-    finally:
-        await hub.broadcast({"kind": "status", "running": False})
-        await hub.broadcast({"kind": "done"})
-
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
-    seed_if_empty()
+    ensure_patrol()
     row = read_one("SELECT lat, lon FROM patrols WHERE id = ?", ("cg-12",))
     if row is not None:
         patrol_state["lat"] = row["lat"]
         patrol_state["lon"] = row["lon"]
     yield
-    if sim_task and not sim_task.done():
-        sim_task.cancel()
+    await _stop_worker()
 
 
-app = FastAPI(title="Cityguard", lifespan=lifespan)
+app = FastAPI(title="CityGuard", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -249,9 +217,10 @@ def route() -> dict:
 
 @app.post("/api/patrol/position")
 async def patrol_position(body: PositionIn) -> dict:
-    """Pozycja na żywo z workera inferencji. Przy włączonej symulacji ignorowana."""
-    if sim_task and not sim_task.done():
-        return {"accepted": False, "reason": "trwa symulacja"}
+    """Pozycja na żywo z workera inferencji (ml/infer.py)."""
+    if body.running is not None and body.running != patrol_state.get("worker_running"):
+        patrol_state["worker_running"] = body.running
+        await hub.broadcast({"kind": "status", "running": body.running, "speed": body.speed or 1})
     return await _set_position(body.t, body.lat, body.lon, body.heading)
 
 
@@ -272,7 +241,11 @@ def event_detail(event_id: str) -> dict:
 
 @app.post("/api/events")
 async def create_event(body: EventIn) -> dict:
-    existing = _nearest(body.type, body.lat, body.lon)
+    if "video_t" in body.meta and not body.meta.get("address"):
+        street, district = street_at(float(body.meta["video_t"]))
+        body.meta.setdefault("address", street)
+        body.meta.setdefault("district", district)
+    existing = _nearest(body.type, body.lat, body.lon, body.meta.get("class_name"))
     now = body.timestamp or datetime.now(timezone.utc).isoformat()
     service = body.assigned_to or ("ZDM" if body.type == "road_damage" else "ZOO")
     if existing is not None:
@@ -340,30 +313,77 @@ def stats() -> dict:
     return _stats()
 
 
+def _worker_running() -> bool:
+    return worker is not None and worker.returncode is None
+
+
+def _clear_demo_events() -> None:
+    """Każdy przejazd demo zaczyna się od pustej listy — inaczej dedup łyka wszystkie wykrycia."""
+    write("DELETE FROM events")
+    for path in MEDIA.glob("*"):
+        if path.is_file():
+            path.unlink()
+
+
+async def _watch_worker(proc: asyncio.subprocess.Process) -> None:
+    await proc.wait()
+    patrol_state["worker_running"] = False
+    await hub.broadcast({"kind": "status", "running": False})
+
+
+async def _stop_worker() -> None:
+    if not _worker_running():
+        return
+    assert worker is not None
+    worker.send_signal(signal.SIGINT)
+    try:
+        await asyncio.wait_for(worker.wait(), timeout=3)
+    except asyncio.TimeoutError:
+        worker.kill()
+
+
 @app.post("/api/simulate/start")
 async def start_sim(speed: float = 1) -> dict:
-    global sim_task
+    """Przycisk „Start przejazdu”: odpala ml/infer.py --mock, czyli te same wykrycia co z terminala."""
+    global worker
     if speed <= 0 or speed > 12:
         raise HTTPException(status_code=400, detail="Prędkość poza zakresem")
-    if sim_task and not sim_task.done():
+    if _worker_running():
         return {"running": True}
-    stop_sim.clear()
-    sim_task = asyncio.create_task(_run_sim(speed))
+    python = WORKER_PYTHON if WORKER_PYTHON.exists() else Path(sys.executable)
+    _clear_demo_events()
+    await hub.broadcast({"kind": "reset"})
+    await _set_position(0)
+    worker = await asyncio.create_subprocess_exec(
+        str(python),
+        str(ROOT / "ml" / "infer.py"),
+        "--video",
+        str(DATA / "demo.mp4"),
+        "--route",
+        str(DATA / "route.json"),
+        "--annotations",
+        str(DATA / "annotations.json"),
+        "--mock",
+        "--speed",
+        str(speed),
+        "--api",
+        WORKER_API,
+        cwd=str(ROOT),
+        stdout=asyncio.subprocess.DEVNULL,
+    )
+    asyncio.create_task(_watch_worker(worker))
     return {"running": True, "speed": speed}
 
 
 @app.post("/api/simulate/stop")
 async def halt_sim() -> dict:
-    stop_sim.set()
+    await _stop_worker()
     return {"running": False}
 
 
 @app.post("/api/simulate/reset")
 async def reset_sim() -> dict:
-    stop_sim.set()
-    if sim_task and not sim_task.done():
-        sim_task.cancel()
-    _hide_live()
+    await _stop_worker()
     await hub.broadcast({"kind": "reset"})
     await _set_position(0)
     return {"ok": True}

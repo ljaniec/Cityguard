@@ -20,6 +20,14 @@ def offset_east(lat: float, lon: float, meters: float) -> tuple[float, float]:
     return lat, lon + dlon
 
 
+def offset_right(lat: float, lon: float, heading_deg: float, meters: float) -> tuple[float, float]:
+    """Przesunięcie w prawo od kursu (krawężnik), nie zawsze na wschód."""
+    az = math.radians(heading_deg + 90)
+    dlat = (meters * math.cos(az)) / 111_320
+    dlon = (meters * math.sin(az)) / (111_320 * math.cos(math.radians(lat)))
+    return lat + dlat, lon + dlon
+
+
 def heading(a: tuple[float, float], b: tuple[float, float]) -> float:
     lat1, lon1 = math.radians(a[0]), math.radians(a[1])
     lat2, lon2 = math.radians(b[0]), math.radians(b[1])
@@ -29,24 +37,47 @@ def heading(a: tuple[float, float], b: tuple[float, float]) -> float:
     return (math.degrees(math.atan2(x, y)) + 360) % 360
 
 
+def _is_cut(
+    a: tuple[float, float],
+    b: tuple[float, float],
+    seg_a: int | None,
+    seg_b: int | None,
+) -> bool:
+    """Cięcie montażu: inny segment albo skok > 120 m (linia przez zabudowę)."""
+    if seg_a is not None and seg_b is not None and seg_a != seg_b:
+        return True
+    return haversine(a[0], a[1], b[0], b[1]) > 120
+
+
 def point_at_time(
-    points: list[tuple[float, float]], times: list[float], t: float
+    points: list[tuple[float, float]],
+    times: list[float],
+    t: float,
+    segments: list[int] | None = None,
 ) -> tuple[float, float, float, int]:
-    """Pozycja, azymut i indeks odcinka dla sekundy nagrania. Interpolacja po czasie, nie po długości."""
+    """Pozycja, azymut i indeks odcinka. Po czasie, bez interpolacji przez cięcia montażu."""
     if not points:
         raise ValueError("Pusta trasa")
     if len(points) == 1:
         return points[0][0], points[0][1], 0.0, 0
     if t <= times[0]:
         return points[0][0], points[0][1], heading(points[0], points[1]), 0
-    for i in range(len(points) - 1):
+    last = len(points) - 1
+    for i in range(last):
         if times[i] <= t <= times[i + 1]:
+            seg_a = segments[i] if segments is not None else None
+            seg_b = segments[i + 1] if segments is not None else None
+            if _is_cut(points[i], points[i + 1], seg_a, seg_b):
+                if t < times[i + 1]:
+                    az = heading(points[i - 1], points[i]) if i > 0 else heading(points[i], points[i + 1])
+                    return points[i][0], points[i][1], az, i
+                nxt = min(i + 2, last)
+                return points[i + 1][0], points[i + 1][1], heading(points[i + 1], points[nxt]), i + 1
             span = times[i + 1] - times[i]
             u = 0.0 if span <= 0 else (t - times[i]) / span
             lat = points[i][0] + (points[i + 1][0] - points[i][0]) * u
             lon = points[i][1] + (points[i + 1][1] - points[i][1]) * u
             return lat, lon, heading(points[i], points[i + 1]), i
-    last = len(points) - 1
     return points[last][0], points[last][1], heading(points[last - 1], points[last]), last - 1
 
 

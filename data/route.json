@@ -1,15 +1,185 @@
 {
-  "name": "Stare Miasto: Podzamcze, pl. Matejki, Stradomska",
+  "name": "Stare Miasto: Straszewskiego, pl. Matejki, Stradomska",
   "video": "/data/demo.mp4",
   "duration_s": 21,
-  "note": "Czas t to sekunda w data/demo.mp4. Nagranie jest montażem trzech ujęć, więc między segmentami pozycja przeskakuje (przerwy ok. 5 s i 12 s to czarne klatki).",
+  "source": "OpenStreetMap",
+  "note": "Geometria z OSM (ways). Cięcie montażu = zmiana segmentu, bez linii przez kamienice. Długość odcinka = czas ujęcia x ~11.5 m/s (tempo auta widoczne na filmie).",
   "points": [
-    { "t": 0.0, "lat": 50.0556, "lon": 19.9388, "segment": 1, "street": "ul. Podzamcze", "district": "Stare Miasto – Wawel" },
-    { "t": 5.0, "lat": 50.0557, "lon": 19.9345, "segment": 1, "street": "ul. Podzamcze", "district": "Stare Miasto – Wawel" },
-    { "t": 5.5, "lat": 50.0671, "lon": 19.94135, "segment": 2, "street": "pl. Jana Matejki", "district": "Stare Miasto – Kleparz" },
-    { "t": 10.8, "lat": 50.0656, "lon": 19.94125, "segment": 2, "street": "pl. Jana Matejki / Barbakan", "district": "Stare Miasto – Kleparz" },
-    { "t": 11.9, "lat": 50.0654, "lon": 19.9404, "segment": 2, "street": "ul. Basztowa", "district": "Stare Miasto – Kleparz" },
-    { "t": 12.5, "lat": 50.0535, "lon": 19.9421, "segment": 3, "street": "ul. Stradomska", "district": "Stare Miasto – Stradom" },
-    { "t": 21.0, "lat": 50.0553, "lon": 19.9398, "segment": 3, "street": "ul. Stradomska / Podzamcze", "district": "Stare Miasto – Stradom" }
+    {
+      "t": 0.0,
+      "lat": 50.055803,
+      "lon": 19.934632,
+      "segment": 1,
+      "street": "ul. Floriana Straszewskiego",
+      "district": "Stare Miasto – Wawel"
+    },
+    {
+      "t": 2.7,
+      "lat": 50.055535,
+      "lon": 19.934758,
+      "segment": 1,
+      "street": "ul. Floriana Straszewskiego",
+      "district": "Stare Miasto – Wawel"
+    },
+    {
+      "t": 2.86,
+      "lat": 50.05552,
+      "lon": 19.934766,
+      "segment": 1,
+      "street": "ul. Floriana Straszewskiego",
+      "district": "Stare Miasto – Wawel"
+    },
+    {
+      "t": 3.01,
+      "lat": 50.055505,
+      "lon": 19.934773,
+      "segment": 1,
+      "street": "ul. Floriana Straszewskiego",
+      "district": "Stare Miasto – Wawel"
+    },
+    {
+      "t": 3.22,
+      "lat": 50.055484,
+      "lon": 19.93478,
+      "segment": 1,
+      "street": "ul. Floriana Straszewskiego",
+      "district": "Stare Miasto – Wawel"
+    },
+    {
+      "t": 4.01,
+      "lat": 50.055403,
+      "lon": 19.934807,
+      "segment": 1,
+      "street": "ul. Floriana Straszewskiego",
+      "district": "Stare Miasto – Wawel"
+    },
+    {
+      "t": 4.24,
+      "lat": 50.05538,
+      "lon": 19.934816,
+      "segment": 1,
+      "street": "ul. Floriana Straszewskiego",
+      "district": "Stare Miasto – Wawel"
+    },
+    {
+      "t": 5.0,
+      "lat": 50.055306,
+      "lon": 19.934852,
+      "segment": 1,
+      "street": "ul. Floriana Straszewskiego",
+      "district": "Stare Miasto – Wawel"
+    },
+    {
+      "t": 5.5,
+      "lat": 50.066382,
+      "lon": 19.941954,
+      "segment": 2,
+      "street": "pl. Jana Matejki",
+      "district": "Stare Miasto – Kleparz"
+    },
+    {
+      "t": 10.42,
+      "lat": 50.06591,
+      "lon": 19.941658,
+      "segment": 2,
+      "street": "pl. Jana Matejki",
+      "district": "Stare Miasto – Kleparz"
+    },
+    {
+      "t": 10.72,
+      "lat": 50.065881,
+      "lon": 19.941639,
+      "segment": 2,
+      "street": "pl. Jana Matejki",
+      "district": "Stare Miasto – Kleparz"
+    },
+    {
+      "t": 11.26,
+      "lat": 50.06583,
+      "lon": 19.941606,
+      "segment": 2,
+      "street": "pl. Jana Matejki",
+      "district": "Stare Miasto – Kleparz"
+    },
+    {
+      "t": 11.74,
+      "lat": 50.065784,
+      "lon": 19.941575,
+      "segment": 2,
+      "street": "pl. Jana Matejki",
+      "district": "Stare Miasto – Kleparz"
+    },
+    {
+      "t": 11.9,
+      "lat": 50.065769,
+      "lon": 19.941565,
+      "segment": 2,
+      "street": "pl. Jana Matejki",
+      "district": "Stare Miasto – Kleparz"
+    },
+    {
+      "t": 12.5,
+      "lat": 50.053735,
+      "lon": 19.939587,
+      "segment": 3,
+      "street": "ul. Stradomska",
+      "district": "Stare Miasto – Stradom"
+    },
+    {
+      "t": 12.71,
+      "lat": 50.053753,
+      "lon": 19.939569,
+      "segment": 3,
+      "street": "ul. Stradomska",
+      "district": "Stare Miasto – Stradom"
+    },
+    {
+      "t": 15.63,
+      "lat": 50.053996,
+      "lon": 19.93929,
+      "segment": 3,
+      "street": "ul. Stradomska",
+      "district": "Stare Miasto – Stradom"
+    },
+    {
+      "t": 16.69,
+      "lat": 50.054098,
+      "lon": 19.939226,
+      "segment": 3,
+      "street": "ul. Stradomska",
+      "district": "Stare Miasto – Stradom"
+    },
+    {
+      "t": 17.87,
+      "lat": 50.054215,
+      "lon": 19.939278,
+      "segment": 3,
+      "street": "ul. Stradomska",
+      "district": "Stare Miasto – Stradom"
+    },
+    {
+      "t": 18.22,
+      "lat": 50.054245,
+      "lon": 19.93931,
+      "segment": 3,
+      "street": "ul. Stradomska",
+      "district": "Stare Miasto – Stradom"
+    },
+    {
+      "t": 19.11,
+      "lat": 50.054315,
+      "lon": 19.939404,
+      "segment": 3,
+      "street": "ul. św. Gertrudy",
+      "district": "Stare Miasto – Stradom"
+    },
+    {
+      "t": 21.0,
+      "lat": 50.054462,
+      "lon": 19.939604,
+      "segment": 3,
+      "street": "ul. św. Gertrudy",
+      "district": "Stare Miasto – Stradom"
+    }
   ]
 }

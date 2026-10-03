@@ -1,2 +1,6 @@
+# Torch CPU. Wersja z PyPI ciągnie CUDA + cuDNN (~1 GB) i wywala quota na /tmp (Errno 122).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
+torchvision==0.29.1+cpu
 ultralytics
 opencv-python-headless

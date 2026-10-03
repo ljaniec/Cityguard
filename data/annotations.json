@@ -1,0 +1,72 @@
+{
+  "video": "data/demo.mp4",
+  "note": "Ręczne etykiety z data/demo.mp4. bbox = [x1, y1, x2, y2] jako ułamek szerokości i wysokości klatki. offset_m przesuwa pinezkę w prawo od kursu auta (krawężnik, chodnik).",
+  "items": [
+    {
+      "id": "cam-01",
+      "t": 3.5,
+      "type": "road_damage",
+      "class_name": "patch_crack",
+      "title": "Łaty i spękania na jezdni",
+      "severity": "med",
+      "confidence": 0.71,
+      "bbox": [0.52, 0.69, 0.75, 0.91],
+      "offset_m": 0
+    },
+    {
+      "id": "cam-02",
+      "t": 8.0,
+      "type": "road_damage",
+      "class_name": "edge_break",
+      "title": "Wykruszona krawędź jezdni przy krawężniku",
+      "severity": "med",
+      "confidence": 0.66,
+      "bbox": [0.08, 0.79, 0.18, 0.88],
+      "offset_m": -3
+    },
+    {
+      "id": "cam-03",
+      "t": 13.5,
+      "type": "road_damage",
+      "class_name": "pothole",
+      "title": "Wyrwa w asfalcie na pasie",
+      "severity": "high",
+      "confidence": 0.82,
+      "bbox": [0.34, 0.81, 0.44, 0.89],
+      "offset_m": 0
+    },
+    {
+      "id": "cam-04",
+      "t": 13.5,
+      "type": "litter",
+      "class_name": "paper",
+      "title": "Papier / opakowanie na jezdni",
+      "severity": "low",
+      "confidence": 0.58,
+      "bbox": [0.485, 0.845, 0.53, 0.895],
+      "offset_m": 1
+    },
+    {
+      "id": "cam-05",
+      "t": 15.0,
+      "type": "road_damage",
+      "class_name": "sunken_pavement",
+      "title": "Zapadnięty chodnik, zastoisko wody",
+      "severity": "med",
+      "confidence": 0.74,
+      "bbox": [0.75, 0.84, 0.92, 0.96],
+      "offset_m": 5
+    },
+    {
+      "id": "cam-06",
+      "t": 19.5,
+      "type": "litter",
+      "class_name": "debris_drain",
+      "title": "Liście i błoto zatykają kratkę ściekową",
+      "severity": "med",
+      "confidence": 0.69,
+      "bbox": [0.71, 0.66, 0.85, 0.97],
+      "offset_m": 4
+    }
+  ]
+}

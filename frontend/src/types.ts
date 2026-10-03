@@ -21,6 +21,8 @@ export type CityEvent = {
     priority_reason?: string
     confirmations?: number
     source?: string
+    video_t?: number
+    bbox?: [number, number, number, number]
   }
 }
 
