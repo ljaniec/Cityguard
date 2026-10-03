@@ -2,35 +2,63 @@
 
 Dashboard dla miasta: auta kontroli parkowania wykrywają dziury i śmieci przy drodze. Trening YOLO12 jest w Colabie. Laptop tylko inferuje i pokazuje alerty.
 
-## Trening (Colab)
+## Jak odpalić
 
-1. W Colabie: Środowisko wykonawcze → Zmień typ środowiska → GPU (T4).
-2. Wgraj `ml/train_road.ipynb` na jednym koncie i `ml/train_litter.ipynb` na drugim.
-3. Przy pierwszym pobraniu wgraj token Kaggle (`kaggle.json`). Zbiory są już wpisane: RDD2022 oraz butelki i worki.
-4. Pobierz `cityguard_weights.zip` i rozpakuj do `ml/weights/`:
-   - `best_road.pt`
-   - `best_litter.pt`
-5. Opcjonalnie skopiuj tam też `yolo12n.pt` (wagi COCO). Inferencja użyje ich do rozmycia twarzy i tablic.
+Potrzebne: Python 3.12+, Node.js 22+, plik `data/demo.mp4` (jest w repo).
 
-## Demo lokalnie
+Z katalogu głównego repozytorium, raz:
 
 ```bash
 python3 -m venv backend/.venv
 backend/.venv/bin/pip install -r backend/requirements.txt
+
+python3 -m venv ml/.venv
+mkdir -p "$HOME/.cache/pip-tmp"
+TMPDIR="$HOME/.cache/pip-tmp" ml/.venv/bin/pip install -r ml/requirements.txt
+
+cd frontend && npm install && cd ..
+```
+
+`ml/.venv` jest wymagane: przycisk **Start przejazdu** uruchamia `ml/.venv/bin/python ml/infer.py --mock`. Bez tego środowiska API wstanie, ale przejazd nie wystartuje (w `backend/requirements.txt` nie ma OpenCV).
+
+Potem dwa terminale.
+
+API:
+
+```bash
 backend/.venv/bin/uvicorn app.main:app --app-dir backend --port 8000
 ```
 
-W drugim terminalu:
+Dashboard:
 
 ```bash
-cd frontend && npm install && npm run dev
+cd frontend && npm run dev
 ```
 
-Dashboard: http://127.0.0.1:5173
+Otwórz http://127.0.0.1:5173 i kliknij **Start przejazdu**. Auto jedzie trasą z `data/demo.mp4`, a alerty (dziury i śmieci) pojawiają się na mapie w sekundach z `data/annotations.json`. **Zatrzymaj** kończy przejazd. Tempo zmieniasz suwakiem przed startem.
 
-Albo jednym poleceniem: `docker compose up --build`, potem ten sam adres.
+To samo z terminala, gdy API już działa:
+
+```bash
+ml/.venv/bin/python ml/infer.py --video data/demo.mp4 --mock
+ml/.venv/bin/python ml/infer.py --video data/demo.mp4 --mock --speed 2
+```
+
+Port 8000 zajęty: zatrzymaj poprzedni `uvicorn` i odpal API jeszcze raz. Vite proxy idzie na `http://127.0.0.1:8000` (`frontend/vite.config.ts`).
+
+`docker compose up --build` stawia samo API i dashboard na tym samym adresie. Obraz backendu nie zawiera workera inferencji, więc pełne demo (Start i alerty) odpalaj lokalnie, jak wyżej.
 
 Deploy na Render (jeden serwis, mock): instrukcja i Dockerfile w [`render/`](render/README.md).
+
+## Trening (Colab)
+
+1. W Colabie: Środowisko wykonawcze → Zmień typ środowiska → GPU (T4).
+2. Wgraj `ml/train_road.ipynb` na jednym koncie i `ml/train_litter.ipynb` na drugim (nie mieszaj obu zbiorów na jednym dysku).
+3. Road ściąga RDD2022 z Figshare (S3 SEKILab jest martwy). Zapas: `kaggle.json` + [aliabdelmenam/rdd-2022](https://www.kaggle.com/datasets/aliabdelmenam/rdd-2022). Litter ściąga pLitterStreet z Zenodo. Na krótką sesję ustaw `MAX_IMAGES` (np. 8000 / 4000).
+4. Pobierz ZIP z wagami z ostatniej komórki i rozpakuj do `ml/weights/`:
+   - `best_road.pt`
+   - `best_litter.pt`
+5. Opcjonalnie skopiuj tam też `yolo12n.pt` (wagi COCO). Inferencja użyje ich do rozmycia twarzy i tablic.
 
 ## Film testowy
 
