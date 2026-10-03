@@ -1,0 +1,16 @@
+**/.git
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+backend/.venv
+backend/storage
+frontend/dist
+frontend/node_modules
+ml/.venv
+ml/weights
+ml/runs
+ml/datasets
+ml/*.ipynb
+*.db
+.DS_Store

@@ -30,6 +30,8 @@ Dashboard: http://127.0.0.1:5173
 
 Albo jednym poleceniem: `docker compose up --build`, potem ten sam adres.
 
+Deploy na Render (jeden serwis, mock): instrukcja i Dockerfile w [`render/`](render/README.md).
+
 ## Film testowy
 
 `data/demo.mp4` trwa 21 sekund, 1280×720, 15 kl./s. To początek jazdy autem przez centrum Krakowa (Wawel, Barbakan, zaparkowane auta przy krawężniku, znaki strefy P). Źródło: Relaxing Roads 4K, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), [plik na Wikimedia](https://commons.wikimedia.org/wiki/File:City_Driving_4K-_Krak%C3%B3w_Poland_2024.webm). Na początku widać napis HIGHLIGHTS z oryginału.

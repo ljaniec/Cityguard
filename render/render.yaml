@@ -1,0 +1,18 @@
+# Blueprint Render. Wgraj repo i w dashboardzie: New → Blueprint.
+# Albo stwórz Web Service ręcznie i wskaż ten Dockerfile (kontekst = katalog główny).
+
+services:
+  - type: web
+    name: cityguard
+    runtime: docker
+    plan: free
+    dockerfilePath: render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: CITYGUARD_ROOT
+        value: /app
+      - key: CITYGUARD_STORAGE
+        value: /app/storage
+      - key: CITYGUARD_STATIC
+        value: /app/frontend/dist
