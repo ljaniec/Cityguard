@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #10140f;
+  --color-panel: #18201b;
+  --color-panel-2: #202922;
+  --color-line: #314038;
+  --color-paper: #e7f2e4;
+  --color-mist: #93a399;
+  --color-road: #f0a202;
+  --color-litter: #3ecf8e;
+  --font-sans: "Liberation Sans", "Noto Sans", "Segoe UI", sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: "Liberation Sans", "Noto Sans", "Segoe UI", sans-serif;
+}
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #10140f;
+  font-family: inherit;
+}
+
+.leaflet-container img {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.92) saturate(0.4);
+}
+
+.cg-icon {
+  background: transparent;
+  border: none;
+}
+
+.cg-pin {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #f4fff6;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.28);
+}
+
+.cg-pin.road {
+  background: #f0a202;
+}
+
+.cg-pin.litter {
+  background: #3ecf8e;
+}
+
+.cg-pin.selected {
+  transform: scale(1.45);
+}
+
+.cg-pin.fresh {
+  animation: cg-pulse 1.1s ease-out 3;
+}
+
+.cg-arrow {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 16px solid #f4fff6;
+  filter: drop-shadow(0 0 6px rgba(244, 255, 246, 0.85));
+}
+
+@keyframes cg-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(240, 162, 2, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(240, 162, 2, 0);
+  }
+}

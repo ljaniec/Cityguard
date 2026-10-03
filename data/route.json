@@ -1,0 +1,15 @@
+{
+  "name": "Stare Miasto: Podzamcze, pl. Matejki, Stradomska",
+  "video": "/data/demo.mp4",
+  "duration_s": 21,
+  "note": "Czas t to sekunda w data/demo.mp4. Nagranie jest montażem trzech ujęć, więc między segmentami pozycja przeskakuje (przerwy ok. 5 s i 12 s to czarne klatki).",
+  "points": [
+    { "t": 0.0, "lat": 50.0556, "lon": 19.9388, "segment": 1, "street": "ul. Podzamcze", "district": "Stare Miasto – Wawel" },
+    { "t": 5.0, "lat": 50.0557, "lon": 19.9345, "segment": 1, "street": "ul. Podzamcze", "district": "Stare Miasto – Wawel" },
+    { "t": 5.5, "lat": 50.0671, "lon": 19.94135, "segment": 2, "street": "pl. Jana Matejki", "district": "Stare Miasto – Kleparz" },
+    { "t": 10.8, "lat": 50.0656, "lon": 19.94125, "segment": 2, "street": "pl. Jana Matejki / Barbakan", "district": "Stare Miasto – Kleparz" },
+    { "t": 11.9, "lat": 50.0654, "lon": 19.9404, "segment": 2, "street": "ul. Basztowa", "district": "Stare Miasto – Kleparz" },
+    { "t": 12.5, "lat": 50.0535, "lon": 19.9421, "segment": 3, "street": "ul. Stradomska", "district": "Stare Miasto – Stradom" },
+    { "t": 21.0, "lat": 50.0553, "lon": 19.9398, "segment": 3, "street": "ul. Stradomska / Podzamcze", "district": "Stare Miasto – Stradom" }
+  ]
+}

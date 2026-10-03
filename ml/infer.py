@@ -1,0 +1,279 @@
+"""Inferencja lokalna. Trening jest w ml/train_road.ipynb i ml/train_litter.ipynb, tu tylko gotowe wagi YOLO12."""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import json
+import math
+import sys
+import urllib.error
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+
+Point = tuple[float, float, float]  # lat, lon, sekunda nagrania
+
+
+def read_route(path: Path) -> list[Point]:
+    """data/route.json: punkty {t, lat, lon} albo [lat, lon(, t)]. Bez czasu rozkładamy je równo."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    raw = payload["points"]
+    points: list[Point] = []
+    for index, item in enumerate(raw):
+        if isinstance(item, dict):
+            points.append((float(item["lat"]), float(item["lon"]), float(item.get("t", index))))
+        else:
+            t = float(item[2]) if len(item) > 2 else float(index)
+            points.append((float(item[0]), float(item[1]), t))
+    return points
+
+
+def read_gpx(path: Path) -> list[Point]:
+    root = ET.parse(path).getroot()
+    points: list[Point] = []
+    first: datetime | None = None
+    for node in root.iter():
+        if not (node.tag.endswith("trkpt") and node.get("lat") and node.get("lon")):
+            continue
+        stamp = None
+        for child in node:
+            if child.tag.endswith("time") and child.text:
+                stamp = datetime.fromisoformat(child.text.replace("Z", "+00:00"))
+        if stamp is not None and first is None:
+            first = stamp
+        t = (stamp - first).total_seconds() if stamp is not None and first is not None else float(len(points))
+        points.append((float(node.get("lat", "0")), float(node.get("lon", "0")), t))
+    if not points:
+        raise SystemExit(f"Brak punktów w {path}")
+    return points
+
+
+def point_at_time(points: list[Point], t: float) -> tuple[float, float, float]:
+    """Pozycja i azymut dla sekundy nagrania — ten sam zegar, którym backend steruje mapą i wideo."""
+    if len(points) == 1:
+        return points[0][0], points[0][1], 0.0
+    if t <= points[0][2]:
+        a, b = points[0], points[1]
+        u = 0.0
+    elif t >= points[-1][2]:
+        a, b = points[-2], points[-1]
+        u = 1.0
+    else:
+        a, b = points[0], points[1]
+        for i in range(len(points) - 1):
+            if points[i][2] <= t <= points[i + 1][2]:
+                a, b = points[i], points[i + 1]
+                break
+        span = b[2] - a[2]
+        u = 0.0 if span <= 0 else (t - a[2]) / span
+    lat = a[0] + (b[0] - a[0]) * u
+    lon = a[1] + (b[1] - a[1]) * u
+    dlon = math.radians(b[1] - a[1])
+    y = math.sin(dlon) * math.cos(math.radians(b[0]))
+    x = math.cos(math.radians(a[0])) * math.sin(math.radians(b[0])) - math.sin(math.radians(a[0])) * math.cos(
+        math.radians(b[0])
+    ) * math.cos(dlon)
+    heading = (math.degrees(math.atan2(y, x)) + 360) % 360
+    return lat, lon, heading
+
+
+def severity_for(confidence: float, area: float) -> str:
+    if confidence >= 0.75 or area >= 0.05:
+        return "high"
+    if confidence >= 0.5 or area >= 0.02:
+        return "med"
+    return "low"
+
+
+def blur_privacy(frame, privacy_model):
+    import cv2
+
+    if privacy_model is None:
+        return frame
+    # COCO: 0 osoba, 2 auto, 3 motocykl, 5 autobus, 7 ciężarówka.
+    # Rozmywamy górę osoby (twarz) i dół pojazdu (tablica), bez zapisu numerów.
+    result = privacy_model.predict(frame, classes=[0, 2, 3, 5, 7], conf=0.25, verbose=False)[0]
+    out = frame.copy()
+    height, width = out.shape[:2]
+    if result.boxes is None:
+        return out
+    for box in result.boxes:
+        cls = int(box.cls[0])
+        x1, y1, x2, y2 = (int(v) for v in box.xyxy[0])
+        if cls == 0:
+            y2 = y1 + max(1, int((y2 - y1) * 0.45))
+        else:
+            y1 = y2 - max(1, int((y2 - y1) * 0.28))
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(width, x2), min(height, y2)
+        if x2 - x1 < 2 or y2 - y1 < 2:
+            continue
+        roi = out[y1:y2, x1:x2]
+        out[y1:y2, x1:x2] = cv2.GaussianBlur(roi, (31, 31), 0)
+    return out
+
+
+def post_event(api: str, payload: dict) -> None:
+    data = json.dumps(payload).encode()
+    request = urllib.request.Request(
+        f"{api.rstrip('/')}/api/events",
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            response.read()
+    except urllib.error.URLError as exc:
+        raise SystemExit(f"API nie przyjmuje zdarzeń ({api}): {exc}") from exc
+
+
+def post_position(api: str, t: float, lat: float, lon: float, heading: float) -> None:
+    """Pozycja auta dla dashboardu: mapa i podgląd wideo przesuwają się razem z inferencją."""
+    data = json.dumps({"t": t, "lat": lat, "lon": lon, "heading": heading}).encode()
+    request = urllib.request.Request(
+        f"{api.rstrip('/')}/api/patrol/position",
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            response.read()
+    except urllib.error.URLError:
+        pass  # pozycja jest tylko podglądem, zdarzenia i tak lecą dalej
+
+
+def detections(model, frame, event_type: str, conf: float) -> list[dict]:
+    import cv2
+
+    result = model.predict(frame, conf=conf, verbose=False)[0]
+    found = []
+    if result.boxes is None:
+        return found
+    for box in result.boxes:
+        cls_id = int(box.cls[0])
+        confidence = float(box.conf[0])
+        xywhn = box.xywhn[0]
+        area = float(xywhn[2] * xywhn[3])
+        x1, y1, x2, y2 = (int(v) for v in box.xyxy[0])
+        snapshot = frame.copy()
+        color = (2, 162, 240) if event_type == "road_damage" else (142, 207, 62)
+        cv2.rectangle(snapshot, (x1, y1), (x2, y2), color, 2)
+        ok, encoded = cv2.imencode(".jpg", snapshot, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
+        if not ok:
+            continue
+        found.append(
+            {
+                "type": event_type,
+                "confidence": round(confidence, 4),
+                "severity": severity_for(confidence, area),
+                "class_name": str(result.names[cls_id]),
+                "image_base64": base64.b64encode(encoded.tobytes()).decode(),
+            }
+        )
+    return found
+
+
+def run(args: argparse.Namespace) -> None:
+    import cv2
+    from ultralytics import YOLO
+
+    road_path = Path(args.road)
+    litter_path = Path(args.litter)
+    models: list[tuple[str, object]] = []
+    if road_path.exists():
+        models.append(("road_damage", YOLO(str(road_path))))
+    if litter_path.exists():
+        models.append(("litter", YOLO(str(litter_path))))
+    if not models:
+        raise SystemExit(
+            "Brak wag. Wrzuć best_road.pt i best_litter.pt do ml/weights/ "
+            "(pobierzesz je z ml/train_road.ipynb i ml/train_litter.ipynb)."
+        )
+
+    privacy = None
+    privacy_path = Path(args.privacy)
+    if privacy_path.exists():
+        privacy = YOLO(str(privacy_path))
+        print(f"Anonimizacja: {privacy_path}")
+    else:
+        print("Brak ml/weights/yolo12n.pt — klatki idą bez rozmycia twarzy i tablic.")
+
+    points = read_gpx(Path(args.gpx)) if args.gpx else read_route(Path(args.route))
+    cap = cv2.VideoCapture(args.video)
+    if not cap.isOpened():
+        raise SystemExit(f"Nie otwieram wideo: {args.video}")
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25
+    started = datetime.now(timezone.utc)
+    index = 0
+    sent = 0
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        if args.max_frames and index >= args.max_frames:
+            break
+        if index % args.stride == 0:
+            msec = cap.get(cv2.CAP_PROP_POS_MSEC) or index / fps * 1000
+            video_t = msec / 1000
+            lat, lon, heading = point_at_time(points, video_t)
+            post_position(args.api, video_t, lat, lon, heading)
+            timestamp = (started + timedelta(milliseconds=msec)).isoformat()
+            private = blur_privacy(frame, privacy)
+            height, width = private.shape[:2]
+            scale = 960 / width if width > 960 else 1
+            if scale != 1:
+                private = cv2.resize(private, (960, int(height * scale)))
+            for event_type, model in models:
+                for hit in detections(model, private, event_type, args.conf):
+                    post_event(
+                        args.api,
+                        {
+                            "type": hit["type"],
+                            "lat": lat,
+                            "lon": lon,
+                            "timestamp": timestamp,
+                            "confidence": hit["confidence"],
+                            "severity": hit["severity"],
+                            "meta": {
+                                "class_name": hit["class_name"],
+                                "title": hit["class_name"],
+                                "source": "camera",
+                                "frame": index,
+                                "video_t": round(video_t, 2),
+                            },
+                            "image_base64": hit["image_base64"],
+                        },
+                    )
+                    sent += 1
+        index += 1
+    cap.release()
+    print(f"Wysłano zdarzeń: {sent}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Cityguard — inferencja YOLO12 na nagraniu z auta")
+    parser.add_argument("--video", required=True)
+    parser.add_argument("--route", default="data/route.json")
+    parser.add_argument(
+        "--gpx",
+        default=None,
+        help="Ślad GPS (czas z <time> liczony od pierwszego punktu). Bez tego pozycja idzie po czasie z data/route.json.",
+    )
+    parser.add_argument("--road", default="ml/weights/best_road.pt")
+    parser.add_argument("--litter", default="ml/weights/best_litter.pt")
+    parser.add_argument("--privacy", default="ml/weights/yolo12n.pt")
+    parser.add_argument("--api", default="http://127.0.0.1:8000")
+    parser.add_argument("--conf", type=float, default=0.35)
+    parser.add_argument("--stride", type=int, default=15)
+    parser.add_argument("--max-frames", type=int, default=0)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    try:
+        run(parse_args())
+    except KeyboardInterrupt:
+        sys.exit(130)
