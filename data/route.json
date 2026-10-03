@@ -3,7 +3,7 @@
   "video": "/data/demo.mp4",
   "duration_s": 21,
   "source": "OpenStreetMap",
-  "note": "Geometria z OSM (ways). Cięcie montażu = zmiana segmentu, bez linii przez kamienice. Długość odcinka = czas ujęcia x ~11.5 m/s (tempo auta widoczne na filmie).",
+  "note": "Geometria z OSM. Cięcie montażu = zmiana segmentu. Ujęcie 3: 50 m Stradomskiej do zakrętu na Gertrudę, od 13 s (po planszy), ~25 km/h.",
   "points": [
     {
       "t": 0.0,
@@ -118,23 +118,15 @@
       "district": "Stare Miasto – Kleparz"
     },
     {
-      "t": 12.5,
-      "lat": 50.053735,
-      "lon": 19.939587,
+      "t": 13.0,
+      "lat": 50.053924,
+      "lon": 19.939372,
       "segment": 3,
       "street": "ul. Stradomska",
       "district": "Stare Miasto – Stradom"
     },
     {
-      "t": 12.71,
-      "lat": 50.053753,
-      "lon": 19.939569,
-      "segment": 3,
-      "street": "ul. Stradomska",
-      "district": "Stare Miasto – Stradom"
-    },
-    {
-      "t": 15.63,
+      "t": 14.94,
       "lat": 50.053996,
       "lon": 19.93929,
       "segment": 3,
@@ -142,7 +134,7 @@
       "district": "Stare Miasto – Stradom"
     },
     {
-      "t": 16.69,
+      "t": 17.1,
       "lat": 50.054098,
       "lon": 19.939226,
       "segment": 3,
@@ -150,7 +142,7 @@
       "district": "Stare Miasto – Stradom"
     },
     {
-      "t": 17.87,
+      "t": 19.11,
       "lat": 50.054215,
       "lon": 19.939278,
       "segment": 3,
@@ -158,7 +150,7 @@
       "district": "Stare Miasto – Stradom"
     },
     {
-      "t": 18.22,
+      "t": 19.61,
       "lat": 50.054245,
       "lon": 19.93931,
       "segment": 3,
@@ -166,17 +158,9 @@
       "district": "Stare Miasto – Stradom"
     },
     {
-      "t": 19.11,
+      "t": 20.5,
       "lat": 50.054315,
       "lon": 19.939404,
-      "segment": 3,
-      "street": "ul. św. Gertrudy",
-      "district": "Stare Miasto – Stradom"
-    },
-    {
-      "t": 21.0,
-      "lat": 50.054462,
-      "lon": 19.939604,
       "segment": 3,
       "street": "ul. św. Gertrudy",
       "district": "Stare Miasto – Stradom"
