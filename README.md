@@ -2,6 +2,8 @@
 
 Dashboard dla miasta: auta kontroli parkowania wykrywają dziury i śmieci przy drodze. Trening YOLO12 jest w Colabie. Laptop tylko inferuje i pokazuje alerty.
 
+![Dashboard CityGuard podczas przejazdu](docs/screen.png)
+
 ## Jak odpalić
 
 Potrzebne: Python 3.12+, Node.js 22+. Z katalogu głównego:
@@ -32,6 +34,12 @@ Deploy na Render (jeden serwis, mock): instrukcja i Dockerfile w [`render/`](ren
    - `best_road.pt`
    - `best_litter.pt`
 5. Opcjonalnie skopiuj tam też `yolo12n.pt` (wagi COCO). Inferencja użyje ich do rozmycia twarzy i tablic.
+
+Walidacja po 40 epokach na T4:
+
+![Model nawierzchni — crack / pothole](docs/road_learn.png)
+
+![Model śmieci — bag / bottle / pile / plastic](docs/litter_learn.png)
 
 ## Film testowy
 
