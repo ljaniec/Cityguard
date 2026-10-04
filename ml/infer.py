@@ -170,6 +170,28 @@ def offset_right(lat: float, lon: float, heading: float, meters: float) -> tuple
     return lat + dlat, lon + dlon
 
 
+CLASS_TITLE = {
+    "crack": "Pęknięcie nawierzchni",
+    "pothole": "Wyrwa w jezdni",
+    "bag": "Worek / torba",
+    "bottle": "Butelka",
+    "pile": "Sterta śmieci",
+    "plastic": "Plastik przy drodze",
+}
+
+
+def title_for(class_name: str) -> str:
+    return CLASS_TITLE.get(class_name, class_name.replace("_", " "))
+
+
+def first_existing(*candidates: str) -> Path | None:
+    for raw in candidates:
+        path = Path(raw)
+        if path.exists():
+            return path
+    return None
+
+
 def detections(model, frame, event_type: str, conf: float, ground_y: float) -> list[dict]:
     import cv2
 
@@ -177,6 +199,7 @@ def detections(model, frame, event_type: str, conf: float, ground_y: float) -> l
     found = []
     if result.boxes is None:
         return found
+    height, width = frame.shape[:2]
     for box in result.boxes:
         cls_id = int(box.cls[0])
         confidence = float(box.conf[0])
@@ -192,12 +215,15 @@ def detections(model, frame, event_type: str, conf: float, ground_y: float) -> l
         ok, encoded = cv2.imencode(".jpg", snapshot, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
         if not ok:
             continue
+        class_name = str(result.names[cls_id])
         found.append(
             {
                 "type": event_type,
                 "confidence": round(confidence, 4),
                 "severity": severity_for(confidence, area),
-                "class_name": str(result.names[cls_id]),
+                "class_name": class_name,
+                "title": title_for(class_name),
+                "bbox": [round(x1 / width, 3), round(y1 / height, 3), round(x2 / width, 3), round(y2 / height, 3)],
                 "image_base64": base64.b64encode(encoded.tobytes()).decode(),
             }
         )
@@ -217,79 +243,92 @@ def run(args: argparse.Namespace) -> None:
             "  ml/.venv/bin/python ml/infer.py --video data/demo.mp4"
         )
 
-    road_path = Path(args.road)
-    litter_path = Path(args.litter)
+    road_path = first_existing(args.road, "ml/best_road.pt", "ml/weights/best_road.pt")
+    litter_path = first_existing(args.litter, "ml/best_litter.pt", "ml/weights/best_litter.pt")
     models: list[tuple[str, object]] = []
-    if road_path.exists():
+    if road_path:
         models.append(("road_damage", YOLO(str(road_path))))
-    if litter_path.exists():
+        print(f"Model nawierzchni: {road_path}")
+    if litter_path:
         models.append(("litter", YOLO(str(litter_path))))
+        print(f"Model śmieci: {litter_path}")
     if not models:
         raise SystemExit(
-            "Brak wag. Wrzuć best_road.pt i best_litter.pt do ml/weights/ "
-            "(pobierzesz je z ml/train_road.ipynb i ml/train_litter.ipynb)."
+            "Brak wag. Wrzuć best_road.pt i best_litter.pt do ml/ "
+            "(albo ml/weights/). Pobierzesz je z notebooków w ml/."
         )
 
     privacy = None
-    privacy_path = Path(args.privacy)
-    if privacy_path.exists():
+    privacy_path = first_existing(args.privacy, "ml/yolo12n.pt", "ml/weights/yolo12n.pt")
+    if privacy_path:
         privacy = YOLO(str(privacy_path))
         print(f"Anonimizacja: {privacy_path}")
     else:
-        print("Brak ml/weights/yolo12n.pt — klatki idą bez rozmycia twarzy i tablic.")
+        print("Brak yolo12n.pt — klatki idą bez rozmycia twarzy i tablic.")
 
     points = read_gpx(Path(args.gpx)) if args.gpx else read_route(Path(args.route))
     cap = cv2.VideoCapture(args.video)
     if not cap.isOpened():
         raise SystemExit(f"Nie otwieram wideo: {args.video}")
     fps = cap.get(cv2.CAP_PROP_FPS) or 25
+    clock0 = time.monotonic()
     started = datetime.now(timezone.utc)
     index = 0
     sent = 0
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            break
-        if args.max_frames and index >= args.max_frames:
-            break
-        if index % args.stride == 0:
+    video_t = 0.0
+    lat, lon, heading = point_at_time(points, 0)
+    post_position(args.api, 0, lat, lon, heading, running=True, speed=args.speed)
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            if args.max_frames and index >= args.max_frames:
+                break
             msec = cap.get(cv2.CAP_PROP_POS_MSEC) or index / fps * 1000
             video_t = msec / 1000
             lat, lon, heading = point_at_time(points, video_t)
-            post_position(args.api, video_t, lat, lon, heading)
-            if is_transition(frame):
-                index += 1
-                continue
-            timestamp = (started + timedelta(milliseconds=msec)).isoformat()
-            private = blur_privacy(frame, privacy)
-            height, width = private.shape[:2]
-            scale = 960 / width if width > 960 else 1
-            if scale != 1:
-                private = cv2.resize(private, (960, int(height * scale)))
-            for event_type, model in models:
-                for hit in detections(model, private, event_type, args.conf, args.ground_y):
-                    post_event(
-                        args.api,
-                        {
-                            "type": hit["type"],
-                            "lat": lat,
-                            "lon": lon,
-                            "timestamp": timestamp,
-                            "confidence": hit["confidence"],
-                            "severity": hit["severity"],
-                            "meta": {
-                                "class_name": hit["class_name"],
-                                "title": hit["class_name"],
-                                "source": "camera",
-                                "frame": index,
-                                "video_t": round(video_t, 2),
-                            },
-                            "image_base64": hit["image_base64"],
-                        },
-                    )
-                    sent += 1
-        index += 1
-    cap.release()
+            if index % args.stride == 0:
+                post_position(args.api, video_t, lat, lon, heading, running=True, speed=args.speed)
+                if not is_transition(frame):
+                    timestamp = (started + timedelta(milliseconds=msec)).isoformat()
+                    private = blur_privacy(frame, privacy)
+                    height, width = private.shape[:2]
+                    scale = 960 / width if width > 960 else 1
+                    if scale != 1:
+                        private = cv2.resize(private, (960, int(height * scale)))
+                    for event_type, model in models:
+                        for hit in detections(model, private, event_type, args.conf, args.ground_y):
+                            post_event(
+                                args.api,
+                                {
+                                    "type": hit["type"],
+                                    "lat": lat,
+                                    "lon": lon,
+                                    "timestamp": timestamp,
+                                    "confidence": hit["confidence"],
+                                    "severity": hit["severity"],
+                                    "meta": {
+                                        "class_name": hit["class_name"],
+                                        "title": hit["title"],
+                                        "source": "yolo",
+                                        "frame": index,
+                                        "video_t": round(video_t, 2),
+                                        "bbox": hit["bbox"],
+                                    },
+                                    "image_base64": hit["image_base64"],
+                                },
+                            )
+                            sent += 1
+                            print(f"  {video_t:5.1f} s  {event_type:<11} {hit['title']}  {hit['confidence']:.2f}")
+                wait = clock0 + video_t / max(args.speed, 0.1) - time.monotonic()
+                if wait > 0:
+                    time.sleep(wait)
+            index += 1
+    finally:
+        lat, lon, heading = point_at_time(points, video_t)
+        post_position(args.api, video_t, lat, lon, heading, running=False, speed=args.speed)
+        cap.release()
     print(f"Wysłano zdarzeń: {sent}")
 
 
@@ -385,8 +424,8 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Ślad GPS (czas z <time> liczony od pierwszego punktu). Bez tego pozycja idzie po czasie z data/route.json.",
     )
-    parser.add_argument("--road", default="ml/weights/best_road.pt")
-    parser.add_argument("--litter", default="ml/weights/best_litter.pt")
+    parser.add_argument("--road", default="ml/best_road.pt")
+    parser.add_argument("--litter", default="ml/best_litter.pt")
     parser.add_argument("--privacy", default="ml/weights/yolo12n.pt")
     parser.add_argument("--api", default="http://127.0.0.1:8000")
     parser.add_argument("--conf", type=float, default=0.35)

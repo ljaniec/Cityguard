@@ -55,7 +55,7 @@ Deploy na Render (jeden serwis, mock): instrukcja i Dockerfile w [`render/`](ren
 1. W Colabie: Środowisko wykonawcze → Zmień typ środowiska → GPU (T4).
 2. Wgraj `ml/train_road.ipynb` na jednym koncie i `ml/train_litter.ipynb` na drugim (nie mieszaj obu zbiorów na jednym dysku).
 3. Road ściąga RDD2022 z Figshare (S3 SEKILab jest martwy). Zapas: `kaggle.json` + [aliabdelmenam/rdd-2022](https://www.kaggle.com/datasets/aliabdelmenam/rdd-2022). Litter ściąga pLitterStreet z Zenodo. Na krótką sesję ustaw `MAX_IMAGES` (np. 8000 / 4000).
-4. Pobierz ZIP z wagami z ostatniej komórki i rozpakuj do `ml/weights/`:
+4. Pobierz wagi i wrzuć do `ml/`:
    - `best_road.pt`
    - `best_litter.pt`
 5. Opcjonalnie skopiuj tam też `yolo12n.pt` (wagi COCO). Inferencja użyje ich do rozmycia twarzy i tablic.
@@ -88,7 +88,7 @@ ml/.venv/bin/python ml/infer.py --video data/demo.mp4 --mock
 ml/.venv/bin/python ml/infer.py --video data/demo.mp4 --mock --speed 2
 ```
 
-Przycisk „Start przejazdu” na dashboardzie robi to samo: backend czyści poprzedni przejazd demo i odpala `ml/infer.py --mock` z wybranym tempem („Zatrzymaj” wysyła mu SIGINT).
+Przycisk „Start przejazdu” na dashboardzie robi to samo. Przełącznik **Demo / YOLO** wybiera etykiety z nagrania albo nowe wagi `ml/best_road.pt` i `ml/best_litter.pt`. „Zatrzymaj” wysyła workerowi SIGINT.
 
 ### Tryb `--mock` (MVP)
 
@@ -104,4 +104,4 @@ ml/.venv/bin/python ml/infer.py --video data/demo.mp4
 
 Klatki przejść montażu (średnia jasność < 60, napis HIGHLIGHTS) są pomijane, a ramki kończące się powyżej 55 % wysokości kadru (`--ground-y`) odpadają: dziury i śmieci leżą na ziemi, wyżej są niebo, fasady i napisy.
 
-Potrzebne są wagi `ml/weights/best_road.pt` i `ml/weights/best_litter.pt` oraz działające API. `infer.py` liczy pozycję z czasu klatki (`CAP_PROP_POS_MSEC`) na tej samej trasie i wysyła ją do `POST /api/patrol/position`, więc mapa jedzie razem z inferencją (gdy akurat nie trwa symulacja). Z `--gpx` czas bierze się ze znaczników `<time>` śladu GPS.
+Potrzebne są wagi `ml/best_road.pt` i `ml/best_litter.pt` oraz działające API. `infer.py` liczy pozycję z czasu klatki (`CAP_PROP_POS_MSEC`) na tej samej trasie i wysyła ją do `POST /api/patrol/position`, więc mapa jedzie razem z inferencją (gdy akurat nie trwa symulacja). Z `--gpx` czas bierze się ze znaczników `<time>` śladu GPS.

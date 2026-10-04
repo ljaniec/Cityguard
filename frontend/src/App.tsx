@@ -187,6 +187,7 @@ export function App() {
   const [typeFilter, setTypeFilter] = useState<"all" | EventType>("all");
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const [inferMode, setInferMode] = useState<"mock" | "yolo">("mock");
   const [activeSpeed, setActiveSpeed] = useState(1);
   const [heat, setHeat] = useState(false);
   const [freshIds, setFreshIds] = useState<string[]>([]);
@@ -323,7 +324,9 @@ export function App() {
   async function start() {
     setError(null);
     setActiveSpeed(speed);
-    await readJson(`/api/simulate/start?speed=${speed}`, { method: "POST" });
+    await readJson(`/api/simulate/start?speed=${speed}&mode=${inferMode}`, {
+      method: "POST",
+    });
   }
 
   async function stop() {
@@ -378,6 +381,21 @@ export function App() {
             {online ? "Na żywo" : "Łączenie…"}
           </span>
           <div className="glass flex items-center gap-1 rounded-full p-1">
+            {(
+              [
+                ["mock", "Demo"],
+                ["yolo", "YOLO"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                disabled={running}
+                className={`rounded-full px-2.5 py-1 font-mono text-xs transition ${inferMode === value ? "bg-panel-2 text-paper" : "text-mist hover:text-paper"} disabled:opacity-50`}
+                onClick={() => setInferMode(value)}
+              >
+                {label}
+              </button>
+            ))}
             {[1, 4].map((value) => (
               <button
                 key={value}

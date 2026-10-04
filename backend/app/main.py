@@ -343,36 +343,49 @@ async def _stop_worker() -> None:
 
 
 @app.post("/api/simulate/start")
-async def start_sim(speed: float = 1) -> dict:
-    """Przycisk „Start przejazdu”: odpala ml/infer.py --mock, czyli te same wykrycia co z terminala."""
+async def start_sim(speed: float = 1, mode: str = "mock") -> dict:
+    """Start przejazdu: mock = etykiety z nagrania, yolo = nowe wagi z ml/best_*.pt."""
     global worker
     if speed <= 0 or speed > 12:
         raise HTTPException(status_code=400, detail="Prędkość poza zakresem")
+    if mode not in {"mock", "yolo"}:
+        raise HTTPException(status_code=400, detail="mode=mock albo mode=yolo")
     if _worker_running():
-        return {"running": True}
+        return {"running": True, "mode": mode}
     python = WORKER_PYTHON if WORKER_PYTHON.exists() else Path(sys.executable)
     _clear_demo_events()
     await hub.broadcast({"kind": "reset"})
     await _set_position(0)
-    worker = await asyncio.create_subprocess_exec(
+    command = [
         str(python),
         str(ROOT / "ml" / "infer.py"),
         "--video",
         str(DATA / "demo.mp4"),
         "--route",
         str(DATA / "route.json"),
-        "--annotations",
-        str(DATA / "annotations.json"),
-        "--mock",
         "--speed",
         str(speed),
         "--api",
         WORKER_API,
+    ]
+    if mode == "mock":
+        command.extend(["--mock", "--annotations", str(DATA / "annotations.json")])
+    else:
+        command.extend(
+            [
+                "--road",
+                str(ROOT / "ml" / "best_road.pt"),
+                "--litter",
+                str(ROOT / "ml" / "best_litter.pt"),
+            ]
+        )
+    worker = await asyncio.create_subprocess_exec(
+        *command,
         cwd=str(ROOT),
         stdout=asyncio.subprocess.DEVNULL,
     )
     asyncio.create_task(_watch_worker(worker))
-    return {"running": True, "speed": speed}
+    return {"running": True, "speed": speed, "mode": mode}
 
 
 @app.post("/api/simulate/stop")
