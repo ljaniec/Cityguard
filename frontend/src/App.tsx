@@ -384,7 +384,7 @@ export function App() {
             {(
               [
                 ["mock", "Demo"],
-                ["yolo", "YOLO"],
+                ["yolo", "Produkcja"],
               ] as const
             ).map(([value, label]) => (
               <button

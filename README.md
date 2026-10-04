@@ -4,49 +4,22 @@ Dashboard dla miasta: auta kontroli parkowania wykrywają dziury i śmieci przy 
 
 ## Jak odpalić
 
-Potrzebne: Python 3.12+, Node.js 22+, plik `data/demo.mp4` (jest w repo).
-
-Z katalogu głównego repozytorium, raz:
+Potrzebne: Python 3.12+, Node.js 22+. Z katalogu głównego:
 
 ```bash
-python3 -m venv backend/.venv
-backend/.venv/bin/pip install -r backend/requirements.txt
-
-python3 -m venv ml/.venv
-mkdir -p "$HOME/.cache/pip-tmp"
-TMPDIR="$HOME/.cache/pip-tmp" ml/.venv/bin/pip install -r ml/requirements.txt
-
-cd frontend && npm install && cd ..
+./start.sh
 ```
 
-`ml/.venv` jest wymagane: przycisk **Start przejazdu** uruchamia `ml/.venv/bin/python ml/infer.py --mock`. Bez tego środowiska API wstanie, ale przejazd nie wystartuje (w `backend/requirements.txt` nie ma OpenCV).
+Otwórz http://127.0.0.1:5173 i kliknij **Start przejazdu**. Pierwsze odpalenie samo stawia venv-y i `npm install`. **Demo** = etykiety z nagrania, **Produkcja** = modele YOLO. Ctrl+C gasi API i dashboard.
 
-Potem dwa terminale.
-
-API:
+Ręcznie, dwa terminale (gdy wolisz):
 
 ```bash
 backend/.venv/bin/uvicorn app.main:app --app-dir backend --port 8000
-```
-
-Dashboard:
-
-```bash
 cd frontend && npm run dev
 ```
 
-Otwórz http://127.0.0.1:5173 i kliknij **Start przejazdu**. Auto jedzie trasą z `data/demo.mp4`, a alerty (dziury i śmieci) pojawiają się na mapie w sekundach z `data/annotations.json`. **Zatrzymaj** kończy przejazd. Tempo zmieniasz suwakiem przed startem.
-
-To samo z terminala, gdy API już działa:
-
-```bash
-ml/.venv/bin/python ml/infer.py --video data/demo.mp4 --mock
-ml/.venv/bin/python ml/infer.py --video data/demo.mp4 --mock --speed 2
-```
-
-Port 8000 zajęty: zatrzymaj poprzedni `uvicorn` i odpal API jeszcze raz. Vite proxy idzie na `http://127.0.0.1:8000` (`frontend/vite.config.ts`).
-
-`docker compose up --build` stawia samo API i dashboard na tym samym adresie. Obraz backendu nie zawiera workera inferencji, więc pełne demo (Start i alerty) odpalaj lokalnie, jak wyżej.
+`docker compose up --build` stawia API i dashboard, ale bez workera YOLO — pełne demo odpalaj przez `./start.sh`.
 
 Deploy na Render (jeden serwis, mock): instrukcja i Dockerfile w [`render/`](render/README.md).
 
@@ -88,7 +61,7 @@ ml/.venv/bin/python ml/infer.py --video data/demo.mp4 --mock
 ml/.venv/bin/python ml/infer.py --video data/demo.mp4 --mock --speed 2
 ```
 
-Przycisk „Start przejazdu” na dashboardzie robi to samo. Przełącznik **Demo / YOLO** wybiera etykiety z nagrania albo nowe wagi `ml/best_road.pt` i `ml/best_litter.pt`. „Zatrzymaj” wysyła workerowi SIGINT.
+Przycisk „Start przejazdu” na dashboardzie robi to samo. Przełącznik **Demo / Produkcja** wybiera etykiety z nagrania albo nowe wagi `ml/best_road.pt` i `ml/best_litter.pt`. „Zatrzymaj” wysyła workerowi SIGINT.
 
 ### Tryb `--mock` (MVP)
 
