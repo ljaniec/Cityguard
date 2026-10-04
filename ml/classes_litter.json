@@ -1,0 +1,10 @@
+{
+  "task": "litter",
+  "conf": 0.35,
+  "names": {
+    "0": "bag",
+    "1": "bottle",
+    "2": "pile",
+    "3": "plastic"
+  }
+}

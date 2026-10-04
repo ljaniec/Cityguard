@@ -1,5 +1,5 @@
 import { divIcon, type DivIcon, type Marker as LeafletMarker } from 'leaflet'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet'
 import { LITTER_SVG, ROAD_SVG } from './icons.tsx'
 import type { CityEvent, LatLon, Vehicle } from './types.ts'
@@ -16,6 +16,30 @@ type Props = {
   heat: boolean
   running: boolean
   onSelect: (id: string) => void
+}
+
+const OSM_DE_TILES = 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
+const ESRI_TILES =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+
+function Basemap() {
+  const [url, setUrl] = useState(OSM_DE_TILES)
+  const failed = useRef(false)
+  return (
+    <TileLayer
+      key={url}
+      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      url={url}
+      maxZoom={19}
+      eventHandlers={{
+        tileerror: () => {
+          if (failed.current || url === ESRI_TILES) return
+          failed.current = true
+          setUrl(ESRI_TILES)
+        },
+      }}
+    />
+  )
 }
 
 function FitRoute({ route }: { route: LatLon[] }) {
@@ -40,25 +64,21 @@ function FlyTo({ lat, lon }: { lat: number | null; lon: number | null }) {
 
 function FollowVehicle({ vehicle, follow }: { vehicle: Vehicle | null; follow: boolean }) {
   const map = useMap()
-  const flying = useRef(false)
+  const last = useRef<{ lat: number; lon: number } | null>(null)
   useEffect(() => {
-    if (!vehicle || flying.current) return
-    if (follow && map.getZoom() < 17) {
-      flying.current = true
-      map.once('moveend', () => {
-        flying.current = false
-      })
-      map.flyTo([vehicle.lat, vehicle.lon], 17, { duration: 1.6 })
+    if (!vehicle || !follow) {
+      last.current = null
       return
     }
-    if (map.getCenter().distanceTo([vehicle.lat, vehicle.lon]) > 400) {
-      map.setView([vehicle.lat, vehicle.lon], map.getZoom(), { animate: false })
+    const prev = last.current
+    last.current = { lat: vehicle.lat, lon: vehicle.lon }
+    const zoom = Math.max(map.getZoom(), 16)
+    if (!prev) {
+      map.setView([vehicle.lat, vehicle.lon], zoom, { animate: false })
       return
     }
-    if (!map.getBounds().pad(-0.25).contains([vehicle.lat, vehicle.lon])) {
-      map.panTo([vehicle.lat, vehicle.lon], { animate: true, duration: 1.4 })
-    }
-  }, [map, vehicle, follow])
+    map.setView([vehicle.lat, vehicle.lon], zoom, { animate: false })
+  }, [map, vehicle, follow, vehicle?.lat, vehicle?.lon])
   return null
 }
 
@@ -105,9 +125,10 @@ const carIcon = divIcon({
 function CarMarker({ vehicle, segment }: { vehicle: Vehicle; segment: number }) {
   const marker = useRef<LeafletMarker>(null)
   useEffect(() => {
+    marker.current?.setLatLng([vehicle.lat, vehicle.lon])
     const cone = marker.current?.getElement()?.querySelector<HTMLElement>('.cg-car-cone')
     if (cone) cone.style.transform = `rotate(${vehicle.heading}deg)`
-  }, [vehicle.heading, segment])
+  }, [vehicle.lat, vehicle.lon, vehicle.heading, segment])
   return (
     <Marker
       ref={marker}
@@ -151,11 +172,7 @@ export function MapView({ route, segments, times, clock, events, vehicle, select
 
   return (
     <MapContainer center={center} zoom={15} zoomControl={false} style={{ height: '100%', width: '100%' }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        maxZoom={19}
-      />
+      <Basemap />
       <FitRoute route={route} />
       <FollowVehicle vehicle={vehicle} follow={running} />
       <FlyTo lat={selected?.lat ?? null} lon={selected?.lon ?? null} />

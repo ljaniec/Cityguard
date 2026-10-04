@@ -68,7 +68,7 @@ body {
   max-height: none !important;
 }
 
-/* Kafelki OSM są jasne; ciemny, granatowy wariant robimy filtrem (CARTO dark wymaga dziś klucza API). */
+/* Jasne kafelki OSM / Esri ściemniamy filtrem — oficjalny tile.openstreetmap.org często zwraca 403. */
 .leaflet-tile-pane {
   filter: invert(1) hue-rotate(195deg) brightness(0.82) contrast(1.05) saturate(0.45);
 }

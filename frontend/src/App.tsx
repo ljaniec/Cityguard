@@ -123,6 +123,61 @@ function useNow(intervalMs: number) {
   return now;
 }
 
+function lerp(from: number, to: number, amount: number) {
+  return from + (to - from) * amount;
+}
+
+function lerpAngle(from: number, to: number, amount: number) {
+  const delta = ((((to - from) % 360) + 540) % 360) - 180;
+  return from + delta * amount;
+}
+
+function useSmoothedPatrol(
+  vehicle: Vehicle | null,
+  clock: number,
+  running: boolean,
+) {
+  const [smooth, setSmooth] = useState({ vehicle, clock });
+  const targetVehicle = useRef(vehicle);
+  const targetClock = useRef(clock);
+  const currentVehicle = useRef(vehicle);
+  const currentClock = useRef(clock);
+  targetVehicle.current = vehicle;
+  targetClock.current = clock;
+
+  useEffect(() => {
+    let frame = 0;
+    const step = () => {
+      const target = targetVehicle.current;
+      const current = currentVehicle.current;
+      if (!running || !target || !current) {
+        currentVehicle.current = target;
+        currentClock.current = targetClock.current;
+        setSmooth({ vehicle: target, clock: targetClock.current });
+        frame = window.requestAnimationFrame(step);
+        return;
+      }
+      const jump = Math.hypot(target.lat - current.lat, target.lon - current.lon);
+      const amount = jump > 0.002 ? 1 : 0.28;
+      const nextVehicle = {
+        ...target,
+        lat: lerp(current.lat, target.lat, amount),
+        lon: lerp(current.lon, target.lon, amount),
+        heading: lerpAngle(current.heading, target.heading, amount),
+      };
+      const nextClock = lerp(currentClock.current, targetClock.current, amount);
+      currentVehicle.current = nextVehicle;
+      currentClock.current = nextClock;
+      setSmooth({ vehicle: nextVehicle, clock: nextClock });
+      frame = window.requestAnimationFrame(step);
+    };
+    frame = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(frame);
+  }, [running]);
+
+  return smooth;
+}
+
 export function App() {
   const [events, setEvents] = useState<CityEvent[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -142,6 +197,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [online, setOnline] = useState(false);
   const now = useNow(1000);
+  const display = useSmoothedPatrol(vehicle, clock, running);
 
   const reload = useCallback(async () => {
     const [nextEvents, nextStats, nextRoute, patrol] = await Promise.all([
@@ -456,9 +512,9 @@ export function App() {
             route={route?.points ?? []}
             segments={route?.segments ?? []}
             times={route?.times ?? []}
-            clock={clock}
+            clock={display.clock}
             events={visible}
-            vehicle={vehicle}
+            vehicle={display.vehicle}
             selectedId={selectedId}
             freshIds={freshIds}
             heat={heat}
@@ -527,7 +583,7 @@ export function App() {
         <aside className="mt-3 flex min-h-0 flex-col gap-3 lg:mt-0 lg:overflow-y-auto lg:pr-1">
           <CameraFeed
             src={route?.video_url ?? null}
-            t={clock}
+            t={display.clock}
             running={running}
             speed={activeSpeed}
             duration={route?.duration_s ?? 0}
